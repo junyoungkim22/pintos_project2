@@ -32,22 +32,39 @@ void setup_stack_args(const char *file_name, void **esp)
 		arg_addr_arr = realloc(arg_addr_arr, (argc+1) * sizeof(char*));
 		*esp = *esp - (strlen(token) + 1);
 		memcpy(*esp, token, strlen(token) + 1);
-		arg_addr_arr[0] = *esp;
+		arg_addr_arr[argc] = *esp;
 		argc++;
 	}
 	
-	//(*esp)--;
-	//memcpy(*esp, NULL, 1);
-	/*
-	while((*esp) % 4 != 0)
+	while((int) (*esp) % 4 != 0)
 	{
-		(uint8_t) (**esp) = (uint8_t) NULL;
+		(*esp)--;
 	}
-	*/
+	
+	for(int i = argc; i >= 0; i--)
+	{
+		*esp = *esp - 4;
+		if(i == argc)
+		{
+			continue;
+		}
+		
+		**((char***) esp) = arg_addr_arr[i];
+	}
 
+	*esp = *esp - 4;
+	**((void***) esp) = *esp + 4;
+
+	*esp = *esp - 4;
+	**((int**) esp) = argc;
+
+	*esp = *esp - 4;
+
+	/*
 	printf("ESP is %p\n", *esp);
-	hex_dump(*esp, *esp, 100, true);
+	hex_dump(*esp, *esp, 200, true);
 	printf("ARGC is %d\n", argc);	
+	*/
 	free(arg_addr_arr);
 }
 
@@ -348,6 +365,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   success = true;
 	setup_stack_args(file_name, esp);
+	hex_dump(*esp, *esp, 200, true);
 
  done:
   /* We arrive here whether the load is successful or not. */
