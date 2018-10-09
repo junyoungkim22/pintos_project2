@@ -25,12 +25,28 @@ void setup_stack_args(const char *file_name, void **esp)
 {
 	int argc = 0;
 	char *token, *save_ptr;
-	char *arg_addr_arr;
+	char **arg_addr_arr;
+	arg_addr_arr = malloc(argc * sizeof(char*));
 	for(token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
 	{
+		arg_addr_arr = realloc(arg_addr_arr, (argc+1) * sizeof(char*));
+		*esp = *esp - (strlen(token) + 1);
+		memcpy(*esp, token, strlen(token) + 1);
+		arg_addr_arr[0] = *esp;
 		argc++;
 	}
-	arg_addr_arr = malloc(argc * sizeof(char*));
+	
+	//(*esp)--;
+	//memcpy(*esp, NULL, 1);
+	/*
+	while((*esp) % 4 != 0)
+	{
+		(uint8_t) (**esp) = (uint8_t) NULL;
+	}
+	*/
+
+	printf("ESP is %p\n", *esp);
+	hex_dump(*esp, *esp, 100, true);
 	printf("ARGC is %d\n", argc);	
 	free(arg_addr_arr);
 }
@@ -242,7 +258,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-	printf("OPENING THIS FILE %s\n\n\n", token);
   /* Open executable file. */
   file = filesys_open (token);
 	//file = filesys_open(token);
