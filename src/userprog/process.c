@@ -21,6 +21,20 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+void setup_stack_args(const char *file_name, void **esp)
+{
+	int argc = 0;
+	char *token, *save_ptr;
+	char *arg_addr_arr;
+	for(token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+	{
+		argc++;
+	}
+	arg_addr_arr = malloc(argc * sizeof(char*));
+	printf("ARGC is %d\n", argc);	
+	free(arg_addr_arr);
+}
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -37,6 +51,7 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+	//printf("STARTING PROCESS %s\n\n\n", fn_copy);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -88,7 +103,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+	while(1);
+  //return -1;
 }
 
 /* Free the current process's resources. */
@@ -214,6 +230,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+	char *token, *save_ptr;
+
+  char *fn_copy = palloc_get_page (0);
+  strlcpy (fn_copy, file_name, PGSIZE);
+	token = strtok_r (fn_copy, " ", &save_ptr);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -221,8 +242,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+	printf("OPENING THIS FILE %s\n\n\n", token);
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (token);
+	//file = filesys_open(token);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -309,9 +332,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
+	setup_stack_args(file_name, esp);
 
  done:
   /* We arrive here whether the load is successful or not. */
+	palloc_free_page(fn_copy);
   file_close (file);
   return success;
 }
