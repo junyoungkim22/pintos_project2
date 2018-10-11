@@ -62,9 +62,9 @@ void setup_stack_args(const char *file_name, void **esp)
 
 	/*
 	printf("ESP is %p\n", *esp);
-	hex_dump(*esp, *esp, 200, true);
 	printf("ARGC is %d\n", argc);	
 	*/
+	hex_dump(*esp, *esp, 200, true);
 	free(arg_addr_arr);
 }
 
@@ -365,7 +365,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   success = true;
 	setup_stack_args(file_name, esp);
-	hex_dump(*esp, *esp, 200, true);
+	//hex_dump(*esp, *esp, 200, true);
 
  done:
   /* We arrive here whether the load is successful or not. */
