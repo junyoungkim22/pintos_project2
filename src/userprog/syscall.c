@@ -7,6 +7,7 @@
 #include "lib/string.h"
 #include "devices/shutdown.h"
 #include "filesys/filesys.h"
+#include "filesys/file.h"
 
 static void syscall_handler (struct intr_frame *);
 static bool is_valid_vaddr(const void *va);
@@ -14,6 +15,22 @@ void *get_arg(void *esp, int arg_num);
 void sys_exit(int exit_status);
 int allocate_fd(void);
 bool fd_compare(struct list_elem *e1, struct list_elem *e2, void *aux);
+struct open_file *find_open_file(int fd);
+
+struct 
+open_file *find_open_file(int fd)
+{
+	struct list_elem *e;
+	struct list *open_file_list = &thread_current()->open_file_list;
+	struct open_file *of;
+	for(e = list_begin(open_file_list); e != list_end(open_file_list); e = list_next(e))
+	{
+		of = list_entry(e, struct open_file, open_file_elem);
+		if(of->fd == fd)
+			return of;
+	}
+	return NULL;
+}
 
 struct lock filesys_lock;
 
@@ -43,9 +60,16 @@ syscall_handler (struct intr_frame *f UNUSED)
 			sys_exit((int) get_arg(f->esp, 1));
 			break;
 		case SYS_CLOSE:
-			name = (char*) get_arg(f->esp, 1);
-			if(!is_valid_vaddr(name))
-				sys_exit(-1);
+			fd = (int) get_arg(f->esp, 1);
+			open_file = find_open_file(fd);
+			if(open_file == NULL)
+				break;
+			list_remove(&open_file->open_file_elem);
+			lock_acquire(&filesys_lock);
+			file_close(open_file->file);
+			lock_release(&filesys_lock);
+			free(open_file);
+			break;
 		case SYS_OPEN:
 			name = (char*) get_arg(f->esp, 1);
 			if(!is_valid_vaddr(name))
