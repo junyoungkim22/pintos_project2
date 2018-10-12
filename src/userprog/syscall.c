@@ -5,9 +5,11 @@
 #include "threads/thread.h"
 #include "threads/synch.h"
 #include "lib/string.h"
+#include "lib/kernel/list.h"
 #include "devices/shutdown.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "devices/input.h"
 
 static void syscall_handler (struct intr_frame *);
 static bool is_valid_vaddr(const void *va);
@@ -89,14 +91,49 @@ syscall_handler (struct intr_frame *f UNUSED)
 			list_insert_ordered(&thread_current()->open_file_list, &open_file->open_file_elem, fd_compare, NULL);
 			f->eax = fd;
 			break;
+		case SYS_READ:
+			fd = (int) get_arg(f->esp, 1);
+			buffer = (char*) get_arg(f->esp, 2);
+			size = (off_t) get_arg(f->esp, 3);
+			if(!is_valid_vaddr(buffer))
+				sys_exit(-1);
+			if(fd == 0)
+			{
+				*buffer = (char) input_getc();
+				f->eax = 1;
+				break;
+			}
+			open_file = find_open_file(fd);
+			if(open_file == NULL)
+			{
+				f->eax = -1;
+				break;
+			}
+			lock_acquire(&filesys_lock);
+			f->eax = file_read(open_file->file, buffer, size);
+			lock_release(&filesys_lock);	
+			break;
+		case SYS_FILESIZE:	
+			fd = (int) get_arg(f->esp, 1);
+			open_file = find_open_file(fd);
+			lock_acquire(&filesys_lock);
+			f->eax = file_length(open_file->file);
+			lock_release(&filesys_lock);
+			break;
 		case SYS_WRITE:
 			fd = (int) get_arg(f->esp, 1);
 			buffer = (char*) get_arg(f->esp, 2);
 			size = (unsigned) get_arg(f->esp, 3);
+			if(!is_valid_vaddr(buffer))
+				sys_exit(-1);
 			if(fd == 1)
 			{
 				putbuf(buffer, size);
 			}
+			if(strlen(buffer) < size)
+				f->eax = strlen(buffer);
+			else
+				f->eax = size;
 			break;
 		case SYS_CREATE:
 			name = (char*) get_arg(f->esp, 1);
