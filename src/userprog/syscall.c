@@ -129,11 +129,21 @@ syscall_handler (struct intr_frame *f UNUSED)
 			if(fd == 1)
 			{
 				putbuf(buffer, size);
+				if(strlen(buffer) < size)
+					f->eax = strlen(buffer);
+				else
+					f->eax = size;
+				break;
 			}
-			if(strlen(buffer) < size)
-				f->eax = strlen(buffer);
-			else
-				f->eax = size;
+			open_file = find_open_file(fd);
+			if(open_file == NULL)
+			{
+				f->eax = -1;
+				break;
+			}
+			lock_acquire(&filesys_lock);
+			f->eax = file_write(open_file->file, buffer, size);
+			lock_release(&filesys_lock);
 			break;
 		case SYS_CREATE:
 			name = (char*) get_arg(f->esp, 1);
