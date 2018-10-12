@@ -3,17 +3,22 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 #include "lib/string.h"
 #include "devices/shutdown.h"
+#include "filesys/filesys.h"
 
 static void syscall_handler (struct intr_frame *);
 static bool is_valid_vaddr(const void *va);
 void *get_arg(void *esp, int arg_num);
 void sys_exit(int exit_status);
 
+struct lock filesys_lock;
+
 void
 syscall_init (void) 
 {
+	lock_init(&filesys_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -24,6 +29,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 	int fd;
 	char *buffer;
 	unsigned size;
+	bool success;
+	char *name;
 
 	syscall_num = (int) get_arg(f->esp, 0);
 	switch(syscall_num)
@@ -50,6 +57,18 @@ syscall_handler (struct intr_frame *f UNUSED)
 			{
 				putbuf(buffer, size);
 			}
+			break;
+		case SYS_CREATE:
+			name = (char*) get_arg(f->esp, 1);
+			size = (unsigned) get_arg(f->esp, 2);
+			if(!is_valid_vaddr(name))
+			{
+				sys_exit(-1);
+			}
+			lock_acquire(&filesys_lock);
+			success = filesys_create(name, size);
+			lock_release(&filesys_lock);
+			f->eax = success;
 			break;
 		case SYS_HALT:
 			shutdown_power_off();
