@@ -16,23 +16,8 @@ static bool is_valid_vaddr(const void *va);
 void *get_arg(void *esp, int arg_num);
 void sys_exit(int exit_status);
 int allocate_fd(void);
-bool fd_compare(struct list_elem *e1, struct list_elem *e2, void *aux);
+bool fd_compare(const struct list_elem *e1, const struct list_elem *e2, void *aux);
 struct open_file *find_open_file(int fd);
-
-struct 
-open_file *find_open_file(int fd)
-{
-	struct list_elem *e;
-	struct list *open_file_list = &thread_current()->open_file_list;
-	struct open_file *of;
-	for(e = list_begin(open_file_list); e != list_end(open_file_list); e = list_next(e))
-	{
-		of = list_entry(e, struct open_file, open_file_elem);
-		if(of->fd == fd)
-			return of;
-	}
-	return NULL;
-}
 
 struct lock filesys_lock;
 
@@ -54,6 +39,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 	char *name;
 	struct file *file_addr;
 	struct open_file *open_file;
+	off_t new_pos;
 
 	syscall_num = (int) get_arg(f->esp, 0);
 	switch(syscall_num)
@@ -155,6 +141,38 @@ syscall_handler (struct intr_frame *f UNUSED)
 			lock_release(&filesys_lock);
 			f->eax = success;
 			break;
+		case SYS_REMOVE:
+			name = (char*) get_arg(f->esp, 1);
+			if(!is_valid_vaddr(name))
+				sys_exit(-1);
+			lock_acquire(&filesys_lock);
+			success = filesys_remove(name);
+			lock_release(&filesys_lock);
+			f->eax = success;
+			break;
+		case SYS_SEEK:
+			fd = (int) get_arg(f->esp, 1);
+			new_pos = (off_t) get_arg(f->esp, 2);
+			if(fd < 2)
+				break;
+			open_file = find_open_file(fd);
+			if(open_file == NULL)
+				break;
+			lock_acquire(&filesys_lock);
+			file_seek(open_file->file, new_pos);
+			lock_release(&filesys_lock);	
+			break;	
+		case SYS_TELL:
+			fd = (int) get_arg(f->esp, 1);
+			if(fd < 2)
+				break;
+			open_file = find_open_file(fd);
+			if(open_file == NULL)
+				break;
+			lock_acquire(&filesys_lock);
+			f->eax = (unsigned) file_tell(open_file->file);
+			lock_release(&filesys_lock);	
+			break;		
 		case SYS_HALT:
 			shutdown_power_off();
 			break;
@@ -219,9 +237,24 @@ allocate_fd()
 	return allo_fd;
 }
 
-bool fd_compare(struct list_elem *e1, struct list_elem *e2, void *aux)
+struct 
+open_file *find_open_file(int fd)
 {
-	(void*) aux;
+	struct list_elem *e;
+	struct list *open_file_list = &thread_current()->open_file_list;
+	struct open_file *of;
+	for(e = list_begin(open_file_list); e != list_end(open_file_list); e = list_next(e))
+	{
+		of = list_entry(e, struct open_file, open_file_elem);
+		if(of->fd == fd)
+			return of;
+	}
+	return NULL;
+}
+
+bool fd_compare(const struct list_elem *e1, const struct list_elem *e2, void *aux)
+{
+	(void) aux;
 	struct open_file *of1, *of2;
 	of1 = list_entry(e1, struct open_file, open_file_elem);
 	of2 = list_entry(e2, struct open_file, open_file_elem);
