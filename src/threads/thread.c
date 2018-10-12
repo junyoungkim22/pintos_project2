@@ -174,6 +174,8 @@ thread_create (const char *name, int priority,
 
   ASSERT (function != NULL);
 
+	//printf("Creating thread %s\n\n", name);
+
   /* Allocate thread. */
   t = palloc_get_page (PAL_ZERO);
   if (t == NULL)
@@ -197,6 +199,11 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
+
+#ifdef USERPROG
+	/* Add thread to child list */
+	list_push_back(&thread_current()->child_list, &t->child_elem);
+#endif
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -284,6 +291,9 @@ thread_exit (void)
 
 #ifdef USERPROG
   process_exit ();
+	sema_up(&thread_current()->exit_sema);
+	sema_down(&thread_current()->exit_sema2);
+	//cond_wait(&thread_current()->exit_cond, &thread_current()->exit_lock);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
@@ -463,6 +473,12 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
+#ifdef USERPROG
+	list_init(&t->child_list);
+	sema_init(&t->exit_sema, 0);
+	sema_init(&t->exit_sema2, 0);
+#endif
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

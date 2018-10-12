@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -64,7 +65,7 @@ void setup_stack_args(const char *file_name, void **esp)
 	printf("ESP is %p\n", *esp);
 	printf("ARGC is %d\n", argc);	
 	*/
-	hex_dump(*esp, *esp, 200, true);
+	//hex_dump(*esp, *esp, 200, true);
 	free(arg_addr_arr);
 }
 
@@ -136,8 +137,34 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-	while(1);
-  //return -1;
+	//printf("waiting thread name: %s\n", thread_current()->name);
+	struct list_elem *e;
+	struct thread *t;
+	bool found = false;
+	int exit_status;
+	for(e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e))
+	{
+		t = list_entry(e, struct thread, child_elem);
+		if(t->tid == child_tid)
+		{
+			found = true;
+			break;
+		}
+	}
+	
+	/*
+	if(found)
+		printf("child thread name: %s\n", t->name);
+	else
+		printf("not found\n");
+	*/
+	if(!found)
+		return -1;
+	//lock_acquire(&t->exit_lock);
+	sema_down(&t->exit_sema);
+	exit_status = t->exit_status;
+	sema_up(&t->exit_sema2);
+	return exit_status;
 }
 
 /* Free the current process's resources. */
@@ -277,7 +304,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (token);
-	//file = filesys_open(token);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
