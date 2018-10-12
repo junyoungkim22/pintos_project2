@@ -12,6 +12,8 @@ static void syscall_handler (struct intr_frame *);
 static bool is_valid_vaddr(const void *va);
 void *get_arg(void *esp, int arg_num);
 void sys_exit(int exit_status);
+int allocate_fd(void);
+bool fd_compare(struct list_elem *e1, struct list_elem *e2, void *aux);
 
 struct lock filesys_lock;
 
@@ -31,25 +33,39 @@ syscall_handler (struct intr_frame *f UNUSED)
 	unsigned size;
 	bool success;
 	char *name;
+	struct file *file_addr;
+	struct open_file *open_file;
 
 	syscall_num = (int) get_arg(f->esp, 0);
 	switch(syscall_num)
 	{
 		case SYS_EXIT:
 			sys_exit((int) get_arg(f->esp, 1));
-			/*
-			thread_current()->exit_status = (int) get_arg(f->esp, 1);
-			thread_exit();
-			*/
+			break;
+		case SYS_CLOSE:
+			name = (char*) get_arg(f->esp, 1);
+			if(!is_valid_vaddr(name))
+				sys_exit(-1);
+		case SYS_OPEN:
+			name = (char*) get_arg(f->esp, 1);
+			if(!is_valid_vaddr(name))
+				sys_exit(-1);
+			lock_acquire(&filesys_lock);
+			file_addr = filesys_open(name);
+			lock_release(&filesys_lock);
+			if(file_addr == NULL)
+			{
+				f->eax = -1;
+				break;
+			}
+			fd = allocate_fd();
+			open_file = malloc(sizeof(struct open_file));
+			open_file->fd = fd;
+			open_file->file = file_addr;
+			list_insert_ordered(&thread_current()->open_file_list, &open_file->open_file_elem, fd_compare, NULL);
+			f->eax = fd;
 			break;
 		case SYS_WRITE:
-			/*
-			if(!is_valid_vaddr(get_arg(f->esp, 2)))
-			{
-				printf("invalid address\n");
-				//do something about invalid address
-			}
-			*/
 			fd = (int) get_arg(f->esp, 1);
 			buffer = (char*) get_arg(f->esp, 2);
 			size = (unsigned) get_arg(f->esp, 3);
@@ -62,9 +78,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			name = (char*) get_arg(f->esp, 1);
 			size = (unsigned) get_arg(f->esp, 2);
 			if(!is_valid_vaddr(name))
-			{
 				sys_exit(-1);
-			}
 			lock_acquire(&filesys_lock);
 			success = filesys_create(name, size);
 			lock_release(&filesys_lock);
@@ -114,13 +128,31 @@ static bool is_valid_vaddr(const void *va)
 	if(pagedir_get_page(thread_current()->pagedir, va) == NULL)
 		return false;
 	return true;
-	/*
-	uint32_t *pt = lookup_page(thread_current()->pagedir , va, false);
-	if(pt == NULL)
-		return false;
-	if(((uint32_t) pt) & PTE_P)
-		return true;
-	return false;
-	*/
 }
 
+int
+allocate_fd()
+{
+	struct list_elem *e;
+	struct list *open_file_list = &thread_current()->open_file_list;
+	struct open_file *of;
+	int allo_fd = 2;
+	for(e = list_begin(open_file_list); e != list_end(open_file_list); e = list_next(e))
+	{
+		of = list_entry(e, struct open_file, open_file_elem);
+		if(of->fd == allo_fd)
+			allo_fd++;
+		else
+			break;
+	}
+	return allo_fd;
+}
+
+bool fd_compare(struct list_elem *e1, struct list_elem *e2, void *aux)
+{
+	(void*) aux;
+	struct open_file *of1, *of2;
+	of1 = list_entry(e1, struct open_file, open_file_elem);
+	of2 = list_entry(e2, struct open_file, open_file_elem);
+	return of1->fd < of2->fd;
+}

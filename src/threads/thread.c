@@ -476,6 +476,7 @@ init_thread (struct thread *t, const char *name, int priority)
 
 #ifdef USERPROG
 	list_init(&t->child_list);
+	list_init(&t->open_file_list);
 	sema_init(&t->exit_sema, 0);
 	sema_init(&t->exit_sema2, 0);
 #endif

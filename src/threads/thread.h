@@ -103,11 +103,22 @@ struct thread
 		int exit_status;
 		struct semaphore exit_sema;
 		struct semaphore exit_sema2;
+
+		struct list open_file_list;
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+#ifdef USERPROG
+struct open_file
+{
+	int fd;
+	struct file* file;
+	struct list_elem open_file_elem;
+};
+#endif
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
