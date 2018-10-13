@@ -290,13 +290,21 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
+	struct list_elem *e;
+	struct list *child_list;
+	struct thread *t;
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
   process_exit ();
+	child_list = &thread_current()->child_list;
+	for(e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
+	{
+		t = list_entry(e, struct thread, child_elem);
+		sema_up(&t->exit_sema2);
+	}
 	sema_up(&thread_current()->exit_sema);
 	sema_down(&thread_current()->exit_sema2);
-	//cond_wait(&thread_current()->exit_cond, &thread_current()->exit_lock);
 #endif
 
   /* Remove thread from all threads list, set our status to dying,

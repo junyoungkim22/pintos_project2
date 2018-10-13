@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -178,10 +179,30 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+	struct list *open_file_list;
+	struct list_elem *e;
+	struct open_file *of;
 
 	/*Allow write to executable */
 	if(cur->exec_file != NULL)
 		file_close(cur->exec_file);
+
+	open_file_list = &cur->open_file_list;
+	while(!list_empty(open_file_list))
+	{
+		e = list_pop_front(open_file_list);
+		of = list_entry(e, struct open_file, open_file_elem);
+		lock_acquire(&filesys_lock);
+		file_close(of->file);
+		lock_release(&filesys_lock);
+		free(of);
+	}
+	/*
+	for(e = list_begin(open_file_list); e != list_end(open_file_list); e = list_next(e))
+	{
+		of = list_entry(e, struct open_file, open_file_elem);
+	}
+	*/
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

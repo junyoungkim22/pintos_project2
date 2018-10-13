@@ -19,7 +19,7 @@ bool fd_compare(const struct list_elem *e1, const struct list_elem *e2, void *au
 struct open_file *find_open_file(int fd);
 bool string_valid_vaddr(char *s);
 
-struct lock filesys_lock;
+//struct lock filesys_lock;
 
 bool
 string_valid_vaddr(char *s)
