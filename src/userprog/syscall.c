@@ -14,7 +14,6 @@
 static void syscall_handler (struct intr_frame *);
 static bool is_valid_vaddr(const void *va);
 void *get_arg(void *esp, int arg_num);
-void sys_exit(int exit_status);
 int allocate_fd(void);
 bool fd_compare(const struct list_elem *e1, const struct list_elem *e2, void *aux);
 struct open_file *find_open_file(int fd);
@@ -68,10 +67,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 	{
 		case SYS_EXEC:	
 			name = (char*) get_arg(f->esp, 1);
-			/*
-			if(!is_valid_vaddr(name))
-				sys_exit(-1);
-			*/
 			if(!string_valid_vaddr(name))
 				sys_exit(-1);
 			lock_acquire(&filesys_lock);
@@ -100,7 +95,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 			list_remove(&open_file->open_file_elem);
 			lock_acquire(&filesys_lock);
 			file_close(open_file->file);
-			//file_allow_write(open_file->file);
 			lock_release(&filesys_lock);
 			free(open_file);
 			break;
@@ -115,7 +109,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 				f->eax = -1;
 				break;
 			}
-			//file_deny_write(file_addr);
 			lock_release(&filesys_lock);
 			fd = allocate_fd();
 			open_file = malloc(sizeof(struct open_file));
