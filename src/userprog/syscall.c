@@ -61,6 +61,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 	struct open_file *open_file;
 	off_t new_pos;
 	tid_t new_pid;  //1 to 1 mapping between tid and pid
+	tid_t child_tid;
 
 	syscall_num = (int) get_arg(f->esp, 0);
 	switch(syscall_num)
@@ -73,7 +74,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 			*/
 			if(!string_valid_vaddr(name))
 				sys_exit(-1);
+			lock_acquire(&filesys_lock);
 			new_pid = process_execute(name);
+			lock_release(&filesys_lock);
 			sema_down(&thread_current()->start_info.start_sema);
 			if(new_pid == TID_ERROR || !thread_current()->start_info.success)
 			{
@@ -81,6 +84,10 @@ syscall_handler (struct intr_frame *f UNUSED)
 				break;
 			}
 			f->eax = new_pid;	
+			break;
+		case SYS_WAIT:	
+			child_tid = (tid_t) get_arg(f->esp, 1);
+			f->eax = process_wait(child_tid);
 			break;
 		case SYS_EXIT:
 			sys_exit((int) get_arg(f->esp, 1));
@@ -93,6 +100,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			list_remove(&open_file->open_file_elem);
 			lock_acquire(&filesys_lock);
 			file_close(open_file->file);
+			//file_allow_write(open_file->file);
 			lock_release(&filesys_lock);
 			free(open_file);
 			break;
@@ -102,12 +110,13 @@ syscall_handler (struct intr_frame *f UNUSED)
 				sys_exit(-1);
 			lock_acquire(&filesys_lock);
 			file_addr = filesys_open(name);
-			lock_release(&filesys_lock);
 			if(file_addr == NULL)
 			{
 				f->eax = -1;
 				break;
 			}
+			//file_deny_write(file_addr);
+			lock_release(&filesys_lock);
 			fd = allocate_fd();
 			open_file = malloc(sizeof(struct open_file));
 			open_file->fd = fd;

@@ -117,6 +117,8 @@ struct thread
 
 		struct thread *parent;
 		struct child_process_info start_info;
+
+		struct file *exec_file;   //executable file of this process
 #endif
 
     /* Owned by thread.c. */

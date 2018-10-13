@@ -167,6 +167,7 @@ process_wait (tid_t child_tid UNUSED)
 	//lock_acquire(&t->exit_lock);
 	sema_down(&t->exit_sema);
 	exit_status = t->exit_status;
+	list_remove(&t->child_elem);
 	sema_up(&t->exit_sema2);
 	return exit_status;
 }
@@ -177,6 +178,10 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+	/*Allow write to executable */
+	if(cur->exec_file != NULL)
+		file_close(cur->exec_file);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -313,6 +318,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+	
+	/* Deny write to executable */
+	//file_deny_write(file);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -399,8 +407,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-	palloc_free_page(fn_copy);
   file_close (file);
+	/* Deny write to executable */
+	if(success)
+	{
+  	file = filesys_open (token);
+		t->exec_file = file;
+		file_deny_write(file);
+	}
+	palloc_free_page(fn_copy);
   return success;
 }
 
