@@ -184,6 +184,9 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+#ifdef USERPROG
+	t->parent = thread_current();
+#endif
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -479,6 +482,7 @@ init_thread (struct thread *t, const char *name, int priority)
 	list_init(&t->open_file_list);
 	sema_init(&t->exit_sema, 0);
 	sema_init(&t->exit_sema2, 0);
+	sema_init(&t->start_info.start_sema, 0);
 #endif
 
   old_level = intr_disable ();

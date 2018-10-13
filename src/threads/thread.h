@@ -15,6 +15,15 @@ enum thread_status
     THREAD_DYING        /* About to be destroyed. */
   };
 
+#ifdef USERPROG
+/* Struct used to tell whether child process has successfully executed */
+struct child_process_info
+{
+	bool success;
+	struct semaphore start_sema;
+};
+#endif
+
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
@@ -105,6 +114,9 @@ struct thread
 		struct semaphore exit_sema2;
 
 		struct list open_file_list;
+
+		struct thread *parent;
+		struct child_process_info start_info;
 #endif
 
     /* Owned by thread.c. */

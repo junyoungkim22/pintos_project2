@@ -18,8 +18,28 @@ void sys_exit(int exit_status);
 int allocate_fd(void);
 bool fd_compare(const struct list_elem *e1, const struct list_elem *e2, void *aux);
 struct open_file *find_open_file(int fd);
+bool string_valid_vaddr(char *s);
 
 struct lock filesys_lock;
+
+bool
+string_valid_vaddr(char *s)
+{
+	char *it;
+	it = s;
+	while(1)
+	{
+		if(!is_valid_vaddr(it))
+		{
+			return false;
+		}
+		if(*it == NULL)
+		{
+			return true;
+		}
+		it++;
+	}
+}
 
 void
 syscall_init (void) 
@@ -40,10 +60,28 @@ syscall_handler (struct intr_frame *f UNUSED)
 	struct file *file_addr;
 	struct open_file *open_file;
 	off_t new_pos;
+	tid_t new_pid;  //1 to 1 mapping between tid and pid
 
 	syscall_num = (int) get_arg(f->esp, 0);
 	switch(syscall_num)
 	{
+		case SYS_EXEC:	
+			name = (char*) get_arg(f->esp, 1);
+			/*
+			if(!is_valid_vaddr(name))
+				sys_exit(-1);
+			*/
+			if(!string_valid_vaddr(name))
+				sys_exit(-1);
+			new_pid = process_execute(name);
+			sema_down(&thread_current()->start_info.start_sema);
+			if(new_pid == TID_ERROR || !thread_current()->start_info.success)
+			{
+				f->eax = -1;
+				break;
+			}
+			f->eax = new_pid;	
+			break;
 		case SYS_EXIT:
 			sys_exit((int) get_arg(f->esp, 1));
 			break;
@@ -60,7 +98,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			break;
 		case SYS_OPEN:
 			name = (char*) get_arg(f->esp, 1);
-			if(!is_valid_vaddr(name))
+			if(!string_valid_vaddr(name))
 				sys_exit(-1);
 			lock_acquire(&filesys_lock);
 			file_addr = filesys_open(name);
@@ -81,7 +119,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			fd = (int) get_arg(f->esp, 1);
 			buffer = (char*) get_arg(f->esp, 2);
 			size = (off_t) get_arg(f->esp, 3);
-			if(!is_valid_vaddr(buffer))
+			if(!string_valid_vaddr(buffer))
 				sys_exit(-1);
 			if(fd == 0)
 			{
@@ -110,7 +148,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			fd = (int) get_arg(f->esp, 1);
 			buffer = (char*) get_arg(f->esp, 2);
 			size = (unsigned) get_arg(f->esp, 3);
-			if(!is_valid_vaddr(buffer))
+			if(!string_valid_vaddr(buffer))
 				sys_exit(-1);
 			if(fd == 1)
 			{
@@ -134,7 +172,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 		case SYS_CREATE:
 			name = (char*) get_arg(f->esp, 1);
 			size = (unsigned) get_arg(f->esp, 2);
-			if(!is_valid_vaddr(name))
+			if(!string_valid_vaddr(name))
 				sys_exit(-1);
 			lock_acquire(&filesys_lock);
 			success = filesys_create(name, size);
@@ -143,7 +181,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			break;
 		case SYS_REMOVE:
 			name = (char*) get_arg(f->esp, 1);
-			if(!is_valid_vaddr(name))
+			if(!string_valid_vaddr(name))
 				sys_exit(-1);
 			lock_acquire(&filesys_lock);
 			success = filesys_remove(name);
