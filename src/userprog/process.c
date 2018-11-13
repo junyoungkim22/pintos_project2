@@ -62,11 +62,6 @@ void setup_stack_args(const char *file_name, void **esp)
 
 	*esp = *esp - 4;
 
-	/*
-	printf("ESP is %p\n", *esp);
-	printf("ARGC is %d\n", argc);	
-	*/
-	//hex_dump(*esp, *esp, 200, true);
 	free(arg_addr_arr);
 }
 
